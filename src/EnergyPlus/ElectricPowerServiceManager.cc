@@ -3116,7 +3116,8 @@ ElectricStorage::ElectricStorage( // main constructor
       myWarmUpFlag_(false), storageModelMode_(StorageModelType::Invalid), heatLossesDestination_(ThermalLossDestination::Invalid), zoneNum_(0),
       zoneRadFract_(0.0), startingEnergyStored_(0.0), energeticEfficCharge_(0.0), energeticEfficDischarge_(0.0), maxPowerDraw_(0.0),
       maxPowerStore_(0.0), maxEnergyCapacity_(0.0), parallelNum_(0), seriesNum_(0), numBattery_(0), cycleBinNum_(0), startingSOC_(0.0),
-      maxAhCapacity_(0.0), availableFrac_(0.0), chargeConversionRate_(0.0), chargedOCV_(0.0), dischargedOCV_(0.0), internalR_(0.0),
+      maxAhCapacity_(0.0), eMSOverrideMaxCapacity_(false), eMSValueMaxCapacity_(0.0), availableFrac_(0.0), chargeConversionRate_(0.0),
+      chargedOCV_(0.0), dischargedOCV_(0.0), internalR_(0.0),
       maxDischargeI_(0.0), cutoffV_(0.0), maxChargeRate_(0.0), lifeCalculation_(false), liIon_dcToDcChargingEff_(0.0), liIon_mass_(0.0),
       liIon_surfaceArea_(0.0), liIon_Cp_(0.0), liIon_heatTransferCoef_(0.0), liIon_Vfull_(0.0), liIon_Vexp_(0.0), liIon_Vnom_(0.0),
       liIon_Vnom_default_(0.0), liIon_Qfull_(0.0), liIon_Qexp_(0.0), liIon_Qnom_(0.0), liIon_C_rate_(0.0), thisTimeStepStateOfCharge_(0.0),
@@ -3512,6 +3513,8 @@ ElectricStorage::ElectricStorage( // main constructor
                 SetupEMSInternalVariable(state, "Electrical Storage Simple Maximum Capacity", name_, "[J]", maxEnergyCapacity_);
             } else if (storageModelMode_ == StorageModelType::KIBaMBattery) {
                 SetupEMSInternalVariable(state, "Electrical Storage Battery Maximum Capacity", name_, "[Ah]", maxAhCapacity_);
+                SetupEMSActuator(
+                    state, "Electrical Storage Battery", name_, "Maximum Module Capacity", "[Ah]", eMSOverrideMaxCapacity_, eMSValueMaxCapacity_);
             }
         }
         if (storageModelMode_ == StorageModelType::LiIonNmcBattery) {
@@ -3916,10 +3919,10 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
 
     Real64 T0 = 0.0;
     Real64 qmaxf = 0.0;
+    Real64 qmax = eMSOverrideMaxCapacity_ ? max(eMSValueMaxCapacity_, 0.0) : maxAhCapacity_;
     Real64 Ef = 0.0;
     Real64 q0 = 0.0;
 
-    Real64 qmax = maxAhCapacity_;
     Real64 E0c = chargedOCV_;
     Real64 E0d = dischargedOCV_;
     Real64 k = chargeConversionRate_;

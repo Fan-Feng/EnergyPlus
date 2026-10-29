@@ -385,6 +385,9 @@ private: // data
     Real64 startingSOC_;                           // [ ] initial fractional state of charge
     Real64 maxAhCapacity_;                         // [Ah]maximum capacity
     Real64 availableFrac_;                         // [ ] maximum fraction of available charge capacity
+    bool eMSOverrideMaxCapacity_ = false;
+    Real64 eMSValueMaxCapacity_ = 0.0;
+
     Real64 chargeConversionRate_;                  // [1/h]change rate from bound charge energy to available charge
     Real64 chargedOCV_;                            // [V] fully charged open circuit voltage
     Real64 dischargedOCV_;                         // [V] fully discharged open circuit voltage
@@ -751,6 +754,9 @@ private: // data
     Real64 eMSValuePelFromStorage_;                           // value EMS is directing to use, power from storage [W]
     bool eMSOverridePelIntoStorage_;                          // if true, EMS calling for override
     Real64 eMSValuePelIntoStorage_;                           // value EMS is directing to use, power into storage [W]
+    // EMS actuator for runtime capacity override
+    bool eMSOverrideMaxCapacity = false;
+    Real64 eMSMaxCapacityValue = 0.0; // [Ah]                 // value EMS is directing to use to override the Max battery capacity
 
 }; // class ElectPowerLoadCenter
 
