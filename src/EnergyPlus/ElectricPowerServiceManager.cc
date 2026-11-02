@@ -1,4 +1,4 @@
-// EnergyPlus, Copyright (c) 1996-2023, The Board of Trustees of the University of Illinois,
+﻿// EnergyPlus, Copyright (c) 1996-2023, The Board of Trustees of the University of Illinois,
 // The Regents of the University of California, through Lawrence Berkeley National Laboratory
 // (subject to receipt of any required approvals from the U.S. Dept. of Energy), Oak Ridge
 // National Laboratory, managed by UT-Battelle, Alliance for Sustainable Energy, LLC, and other
@@ -3307,7 +3307,8 @@ ElectricStorage::ElectricStorage( // main constructor
       myWarmUpFlag_(false), storageModelMode_(StorageModelType::Invalid), availSchedPtr_(0), heatLossesDestination_(ThermalLossDestination::Invalid),
       zoneNum_(0), zoneRadFract_(0.0), startingEnergyStored_(0.0), energeticEfficCharge_(0.0), energeticEfficDischarge_(0.0), maxPowerDraw_(0.0),
       maxPowerStore_(0.0), maxEnergyCapacity_(0.0), parallelNum_(0), seriesNum_(0), numBattery_(0), chargeCurveNum_(0), dischargeCurveNum_(0),
-      cycleBinNum_(0), startingSOC_(0.0), maxAhCapacity_(0.0), availableFrac_(0.0), chargeConversionRate_(0.0), chargedOCV_(0.0), dischargedOCV_(0.0),
+      cycleBinNum_(0), startingSOC_(0.0), maxAhCapacity_(0.0), eMSOverrideMaxCapacity_(false), eMSValueMaxCapacity_(0.0), availableFrac_(0.0),
+      chargeConversionRate_(0.0), chargedOCV_(0.0), dischargedOCV_(0.0),
       internalR_(0.0), maxDischargeI_(0.0), cutoffV_(0.0), maxChargeRate_(0.0), lifeCalculation_(BatteryDegradationModelType::Invalid),
       lifeCurveNum_(0), liIon_dcToDcChargingEff_(0.0), liIon_mass_(0.0), liIon_surfaceArea_(0.0), liIon_Cp_(0.0), liIon_heatTransferCoef_(0.0),
       liIon_Vfull_(0.0), liIon_Vexp_(0.0), liIon_Vnom_(0.0), liIon_Vnom_default_(0.0), liIon_Qfull_(0.0), liIon_Qexp_(0.0), liIon_Qnom_(0.0),
@@ -3765,6 +3766,15 @@ ElectricStorage::ElectricStorage( // main constructor
                 SetupEMSInternalVariable(state, "Electrical Storage Simple Maximum Capacity", name_, "[J]", maxEnergyCapacity_);
             } else if (storageModelMode_ == StorageModelType::KIBaMBattery) {
                 SetupEMSInternalVariable(state, "Electrical Storage Battery Maximum Capacity", name_, "[Ah]", maxAhCapacity_);
+                SetupEMSActuator(
+                    state, "Electrical Storage Battery", name_, "Maximum Module Capacity", "[Ah]", eMSOverrideMaxCapacity_, eMSValueMaxCapacity_);
+                SetupOutputVariable(state,
+                                    "Electric Storage Battery Maximum Capacity",
+                                    OutputProcessor::Unit::Ah,
+                                    maxAhCapacity_,
+                                    OutputProcessor::SOVTimeStepType::System,
+                                    OutputProcessor::SOVStoreType::Average,
+                                    name_);
             }
         }
         if (storageModelMode_ == StorageModelType::LiIonNmcBattery) {
@@ -4024,6 +4034,7 @@ void ElectricStorage::simulate(EnergyPlusData &state,
         simulateSimpleBucketModel(state, powerCharge, powerDischarge, charging, discharging, controlSOCMaxFracLimit, controlSOCMinFracLimit);
     } else if (storageModelMode_ == StorageModelType::KIBaMBattery) {
         simulateKineticBatteryModel(state, powerCharge, powerDischarge, charging, discharging, controlSOCMaxFracLimit, controlSOCMinFracLimit);
+        SetupEMSActuator(state, "Electrical Storage Battery", name_, "Maximum Module Capacity", "[Ah]", eMSOverrideMaxCapacity_, eMSValueMaxCapacity_);
     } else if (storageModelMode_ == StorageModelType::LiIonNmcBattery) {
         simulateLiIonNmcBatteryModel(state, powerCharge, powerDischarge, charging, discharging, controlSOCMaxFracLimit, controlSOCMinFracLimit);
     }
@@ -4142,6 +4153,11 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
     Real64 q0 = 0.0;
     Real64 E0d = 0.0;
 
+    
+    //Apply EMS capacity override (only after warm-up, never allow zero)
+    if (eMSOverrideMaxCapacity_ && eMSValueMaxCapacity_ > 0.0 && !state.dataGlobal->WarmupFlag) {
+        maxAhCapacity_ = eMSValueMaxCapacity_;
+    }
     qmax = maxAhCapacity_;
     E0c = chargedOCV_;
     E0d = dischargedOCV_;

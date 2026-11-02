@@ -391,6 +391,8 @@ private: // data
     Real64 maxPowerDraw_;                          // [W] max rate of discharge
     Real64 maxPowerStore_;                         // [W] max rate of charge
     Real64 maxEnergyCapacity_;                     // [J] max storage capacity
+    bool eMSOverrideMaxCapacity_ = false;
+    Real64 eMSValueMaxCapacity_ = 0.0;
     int parallelNum_;                              // [ ] number of battery modules in parallel
     int seriesNum_;                                // [ ] number of battery modules in series
     int numBattery_;                               // total number of batteries all together
