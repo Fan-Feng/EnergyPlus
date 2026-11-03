@@ -3768,6 +3768,9 @@ ElectricStorage::ElectricStorage( // main constructor
                 SetupEMSInternalVariable(state, "Electrical Storage Battery Maximum Capacity", name_, "[Ah]", maxAhCapacity_);
                 SetupEMSActuator(
                     state, "Electrical Storage Battery", name_, "Maximum Module Capacity", "[Ah]", eMSOverrideMaxCapacity_, eMSValueMaxCapacity_);
+                SetupEMSActuator(
+                    state, "Electrical Storage Battery", name_, "Degradation Mechanism", "[-]", eMSOverrideDegradationMechanism_, eMSValueDegradationMechanism_);
+                // Degradation Mechanism: 1=LAM, 2=LLI, 3=Proportional
                 SetupOutputVariable(state,
                                     "Electric Storage Battery Maximum Capacity",
                                     OutputProcessor::Unit::Ah,
@@ -4159,6 +4162,49 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
         maxAhCapacity_ = eMSValueMaxCapacity_;
     }
     qmax = maxAhCapacity_;
+
+    if (eMSOverrideMaxCapacity_) 
+    {
+        // Adjust stored charge Q based on degradation mechanism when qmax changes
+        Real64 q0Current = lastTimeStepAvailable_ + lastTimeStepBound_;
+        if (previousQmax_ < 0.0) previousQmax_ = qmax; // first call init
+
+        int mechanism = 3; // default: proportional
+        if (eMSOverrideDegradationMechanism_) {
+            int m = static_cast<int>(std::round(eMSValueDegradationMechanism_));
+            if (m >= 1 && m <= 3) mechanism = m;
+        }
+
+        if (q0Current > 0.0 && qmax < previousQmax_) { // only act when capacity degrades
+            if (mechanism == 1) {
+                // Case 1 — LAM: Q unchanged, SoC re-normalises to new qmax
+                // Hard-clamp only if Q exceeds new qmax
+                if (q0Current > qmax) {
+                    Real64 sf = qmax / q0Current;
+                    lastTimeStepAvailable_ *= sf; lastTimeStepBound_ *= sf;
+                    thisTimeStepAvailable_ *= sf; thisTimeStepBound_ *= sf;
+                }
+            } else if (mechanism == 2) {
+                // Case 2 — LLI: Q drops by same absolute Ah as qmax
+                Real64 delta_qmax = previousQmax_ - qmax;
+                Real64 q0New = q0Current - delta_qmax;
+                if (q0New < 0.0) q0New = 0.0;
+                if (q0New > qmax) q0New = qmax;
+                Real64 sf = q0New / q0Current;
+                lastTimeStepAvailable_ *= sf; lastTimeStepBound_ *= sf;
+                thisTimeStepAvailable_ *= sf; thisTimeStepBound_ *= sf;
+            } else {
+                // Case 3 — Proportional: SoC preserved
+                Real64 sf = qmax / previousQmax_;
+                Real64 q0New = q0Current * sf;
+                if (q0New > qmax) q0New = qmax;
+                Real64 applyScale = q0New / q0Current;
+                lastTimeStepAvailable_ *= applyScale; lastTimeStepBound_ *= applyScale;
+                thisTimeStepAvailable_ *= applyScale; thisTimeStepBound_ *= applyScale;
+            }
+        }
+        previousQmax_ = qmax;
+    }
     E0c = chargedOCV_;
     E0d = dischargedOCV_;
     k = chargeConversionRate_;

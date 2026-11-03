@@ -393,6 +393,17 @@ private: // data
     Real64 maxEnergyCapacity_;                     // [J] max storage capacity
     bool eMSOverrideMaxCapacity_ = false;
     Real64 eMSValueMaxCapacity_ = 0.0;
+
+    // Degradation mechanism actuator:
+    //   1 = LAM  (Loss of Active Material): Q unchanged, SoC re-normalises
+    //   2 = LLI  (Loss of Lithium Inventory): Q decreases by delta_Qmax
+    //   3 = Proportional (mixed/default): SoC preserved, Q scaled with Qmax
+    bool eMSOverrideDegradationMechanism_ = false;
+    Real64 eMSValueDegradationMechanism_ = 3.0; // default: proportional
+
+    // Tracks qmax from previous timestep for LLI delta calculation
+    Real64 previousQmax_ = -1.0; // -1 = not yet initialised
+
     int parallelNum_;                              // [ ] number of battery modules in parallel
     int seriesNum_;                                // [ ] number of battery modules in series
     int numBattery_;                               // total number of batteries all together
