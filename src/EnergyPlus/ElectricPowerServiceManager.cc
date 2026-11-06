@@ -3766,8 +3766,7 @@ ElectricStorage::ElectricStorage( // main constructor
                 SetupEMSInternalVariable(state, "Electrical Storage Simple Maximum Capacity", name_, "[J]", maxEnergyCapacity_);
             } else if (storageModelMode_ == StorageModelType::KIBaMBattery) {
                 SetupEMSInternalVariable(state, "Electrical Storage Battery Maximum Capacity", name_, "[Ah]", maxAhCapacity_);
-                SetupEMSActuator(
-                    state, "Electrical Storage Battery", name_, "Maximum Module Capacity", "[Ah]", eMSOverrideMaxCapacity_, eMSValueMaxCapacity_);
+                SetupEMSActuator(state, "Electrical Storage Battery", name_, "Maximum Module Capacity", "[Ah]", eMSOverrideMaxCapacity_, eMSValueMaxCapacity_);
                 SetupEMSActuator(
                     state, "Electrical Storage Battery", name_, "Degradation Mechanism", "[-]", eMSOverrideDegradationMechanism_, eMSValueDegradationMechanism_);
                 // Degradation Mechanism: 1=LAM, 2=LLI, 3=Proportional
@@ -4037,7 +4036,6 @@ void ElectricStorage::simulate(EnergyPlusData &state,
         simulateSimpleBucketModel(state, powerCharge, powerDischarge, charging, discharging, controlSOCMaxFracLimit, controlSOCMinFracLimit);
     } else if (storageModelMode_ == StorageModelType::KIBaMBattery) {
         simulateKineticBatteryModel(state, powerCharge, powerDischarge, charging, discharging, controlSOCMaxFracLimit, controlSOCMinFracLimit);
-        SetupEMSActuator(state, "Electrical Storage Battery", name_, "Maximum Module Capacity", "[Ah]", eMSOverrideMaxCapacity_, eMSValueMaxCapacity_);
     } else if (storageModelMode_ == StorageModelType::LiIonNmcBattery) {
         simulateLiIonNmcBatteryModel(state, powerCharge, powerDischarge, charging, discharging, controlSOCMaxFracLimit, controlSOCMinFracLimit);
     }
