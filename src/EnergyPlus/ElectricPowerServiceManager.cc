@@ -4142,6 +4142,7 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
         Real64 q0Current = lastTimeStepAvailable_ + lastTimeStepBound_;
         if (previousQmax_ < 0.0) previousQmax_ = qmax; // first call init
 
+
         int mechanism = 3; // default: proportional
         if (eMSOverrideDegradationMechanism_) {
             int m = static_cast<int>(std::round(eMSValueDegradationMechanism_));
@@ -4178,6 +4179,8 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
             }
         }
         previousQmax_ = qmax;
+
+
     }
     E0c = chargedOCV_;
     E0d = dischargedOCV_;
@@ -4193,6 +4196,7 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
         powerDischarge = 0.0;
         discharging = false;
     }
+
     if (charging) {
 
         //*************************************************
