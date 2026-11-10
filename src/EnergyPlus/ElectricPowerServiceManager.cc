@@ -4121,16 +4121,78 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
     Real64 Volt = 0.0;
 
     Real64 T0 = 0.0;
+    Real64 E0c = 0.0;
+    Real64 k = 0.0;
+    Real64 c = 0.0;
     Real64 qmaxf = 0.0;
     Real64 Ef = 0.0;
+    Real64 qmax = 0.0;
+    Real64 Pactual = 0.0;
     Real64 q0 = 0.0;
+    Real64 E0d = 0.0;
 
-    Real64 qmax = maxAhCapacity_;
-    Real64 E0c = chargedOCV_;
-    Real64 E0d = dischargedOCV_;
-    Real64 k = chargeConversionRate_;
-    Real64 c = availableFrac_;
+   //Apply EMS capacity override (only after warm-up, never allow zero)
+    if (eMSOverrideMaxCapacity_ && eMSValueMaxCapacity_ > 0.0 && !state.dataGlobal->WarmupFlag) {
+        maxAhCapacity_ = eMSValueMaxCapacity_;
+    }
+    qmax = maxAhCapacity_;
+    if (eMSOverrideMaxCapacity_) 
+    {
+        // Adjust stored charge Q based on degradation mechanism when qmax changes
+        Real64 q0Current = lastTimeStepAvailable_ + lastTimeStepBound_;
+        if (previousQmax_ < 0.0) previousQmax_ = qmax; // first call init
 
+        int mechanism = 3; // default: proportional
+        if (eMSOverrideDegradationMechanism_) {
+            int m = static_cast<int>(std::round(eMSValueDegradationMechanism_));
+            if (m >= 1 && m <= 3) mechanism = m;
+        }
+        if (q0Current > 0.0 && qmax < previousQmax_) { // only act when capacity degrades
+            if (mechanism == 1) {
+                // Case 1 — LAM: Q unchanged, SoC re-normalises to new qmax
+                // Hard-clamp only if Q exceeds new qmax
+                if (q0Current > qmax) {
+                    Real64 sf = qmax / q0Current;
+                    lastTimeStepAvailable_ *= sf; lastTimeStepBound_ *= sf;
+                    thisTimeStepAvailable_ *= sf; thisTimeStepBound_ *= sf;
+                }
+            } else if (mechanism == 2) {
+                // Case 2 — LLI: Q drops by same absolute Ah as qmax
+                Real64 delta_qmax = previousQmax_ - qmax;
+                Real64 q0New = q0Current - delta_qmax;
+                if (q0New < 0.0) {
+                    q0New = 0.0;
+                }
+                if (q0New > qmax) q0New = qmax;
+                Real64 sf = q0New / q0Current;
+                lastTimeStepAvailable_ *= sf; lastTimeStepBound_ *= sf;
+                thisTimeStepAvailable_ *= sf; thisTimeStepBound_ *= sf;
+            } else {
+                // Case 3 — Proportional: SoC preserved
+                Real64 sf = qmax / previousQmax_;
+                Real64 q0New = q0Current * sf;
+                if (q0New > qmax) q0New = qmax;
+                Real64 applyScale = q0New / q0Current;
+                lastTimeStepAvailable_ *= applyScale; lastTimeStepBound_ *= applyScale;
+                thisTimeStepAvailable_ *= applyScale; thisTimeStepBound_ *= applyScale;
+            }
+        }
+        previousQmax_ = qmax;
+    }
+    E0c = chargedOCV_;
+    E0d = dischargedOCV_;
+    k = chargeConversionRate_;
+    c = availableFrac_;
+
+    q0 = lastTimeStepAvailable_ + lastTimeStepBound_;
+    if (charging && q0 > qmax * controlSOCMaxFracLimit) {
+        powerCharge = 0.0;
+        charging = false;
+    }
+    if (discharging && q0 < qmax * controlSOCMinFracLimit) {
+        powerDischarge = 0.0;
+        discharging = false;
+    }
     if (charging) {
 
         //*************************************************
@@ -4138,19 +4200,6 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
         //*************************************************
         Real64 Pw = -powerCharge / numBattery_;
         q0 = lastTimeStepAvailable_ + lastTimeStepBound_;
-        if (q0 > qmax * controlSOCMaxFracLimit) {
-            // stop charging with controller signal for max state of charge
-            Pw = 0.0;
-            powerCharge = 0.0;
-            charging = false;
-            storageMode_ = 0;
-            storedPower_ = 0.0;
-            storedEnergy_ = 0.0;
-            decrementedEnergyStored_ = 0.0;
-            drawnPower_ = 0.0;
-            drawnEnergy_ = 0.0;
-            return;
-        }
 
         I0 = 1.0;                                                                                       // Initial assumption
         T0 = std::abs(qmax / I0);                                                                       // Initial Assumption
@@ -4212,20 +4261,6 @@ void ElectricStorage::simulateKineticBatteryModel(EnergyPlusData &state,
 
         Real64 Pw = powerDischarge / numBattery_;
         q0 = lastTimeStepAvailable_ + lastTimeStepBound_;
-
-        if (q0 < qmax * controlSOCMinFracLimit) {
-            // stop discharging with controller signal for min state of charge
-            Pw = 0.0;
-            discharging = false;
-            powerDischarge = 0.0;
-            storageMode_ = 0;
-            storedPower_ = 0.0;
-            storedEnergy_ = 0.0;
-            decrementedEnergyStored_ = 0.0;
-            drawnPower_ = 0.0;
-            drawnEnergy_ = 0.0;
-            return;
-        }
 
         bool const ok = determineCurrentForBatteryDischarge(state, I0, T0, Volt, Pw, q0, dischargeCurveNum_, k, c, qmax, E0c, internalR_);
         if (!ok) {
