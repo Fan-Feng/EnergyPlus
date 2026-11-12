@@ -3256,7 +3256,7 @@ ElectricStorage::ElectricStorage( // main constructor
       myWarmUpFlag_(false), storageModelMode_(StorageModelType::Invalid), availSchedPtr_(0), heatLossesDestination_(ThermalLossDestination::Invalid),
       zoneNum_(0), zoneRadFract_(0.0), startingEnergyStored_(0.0), energeticEfficCharge_(0.0), energeticEfficDischarge_(0.0), maxPowerDraw_(0.0),
       maxPowerStore_(0.0), maxEnergyCapacity_(0.0), parallelNum_(0), seriesNum_(0), numBattery_(0), chargeCurveNum_(0), dischargeCurveNum_(0),
-      cycleBinNum_(0), startingSOC_(0.0), maxAhCapacity_(0.0), availableFrac_(0.0), chargeConversionRate_(0.0), chargedOCV_(0.0), dischargedOCV_(0.0),
+      cycleBinNum_(0), startingSOC_(0.0), maxAhCapacity_(0.0), eMSOverrideMaxCapacity_(false), eMSValueMaxCapacity_(0.0),  availableFrac_(0.0), chargeConversionRate_(0.0), chargedOCV_(0.0), dischargedOCV_(0.0),
       internalR_(0.0), maxDischargeI_(0.0), cutoffV_(0.0), maxChargeRate_(0.0), lifeCalculation_(BatteryDegradationModelType::Invalid),
       lifeCurveNum_(0), liIon_dcToDcChargingEff_(0.0), liIon_mass_(0.0), liIon_surfaceArea_(0.0), liIon_Cp_(0.0), liIon_heatTransferCoef_(0.0),
       liIon_Vfull_(0.0), liIon_Vexp_(0.0), liIon_Vnom_(0.0), liIon_Vnom_default_(0.0), liIon_Qfull_(0.0), liIon_Qexp_(0.0), liIon_Qnom_(0.0),
@@ -3622,6 +3622,13 @@ ElectricStorage::ElectricStorage( // main constructor
                                 OutputProcessor::StoreType::Average,
                                 name_); // issue #4921
             SetupOutputVariable(state,
+                                "Electric Storage Battery Maximum Capacity",
+                                Constant::Units::Ah,
+                                maxAhCapacity_,
+                                OutputProcessor::TimeStepType::System,
+                                OutputProcessor::StoreType::Average,
+                                name_);
+            SetupOutputVariable(state,
                                 "Electric Storage Charge Fraction",
                                 Constant::Units::None,
                                 fractionSOC_,
@@ -3714,6 +3721,11 @@ ElectricStorage::ElectricStorage( // main constructor
                 SetupEMSInternalVariable(state, "Electrical Storage Simple Maximum Capacity", name_, "[J]", maxEnergyCapacity_);
             } else if (storageModelMode_ == StorageModelType::KIBaMBattery) {
                 SetupEMSInternalVariable(state, "Electrical Storage Battery Maximum Capacity", name_, "[Ah]", maxAhCapacity_);
+			    SetupEMSActuator(
+                    state, "Electrical Storage Battery", name_, "Maximum Module Capacity", "[Ah]", eMSOverrideMaxCapacity_, eMSValueMaxCapacity_);
+                SetupEMSActuator(
+                    state, "Electrical Storage Battery", name_, "Degradation Mechanism", "[-]", eMSOverrideDegradationMechanism_, eMSValueDegradationMechanism_);
+                // Degradation Mechanism: 1=LAM, 2=LLI, 3=Proportional
             }
         }
         if (storageModelMode_ == StorageModelType::LiIonNmcBattery) {
